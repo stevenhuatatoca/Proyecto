@@ -3,6 +3,7 @@ from conexion.conexion import conexion, cerrar_conexion
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, UserMixin, login_user, current_user, login_required, logout_user
 from models import Usuario
+from flask import redirect
 
 
 app = Flask(__name__)
@@ -13,13 +14,14 @@ app.config['SECRET_KEY'] = 'dev-secret-key'
 # -------------------------------
 login_manager = LoginManager()
 login_manager.init_app(app)
-
+login_manager.login_view = "login"
+login_manager.login_message = "Debes iniciar sesión para acceder a esta página"
 
 @login_manager.user_loader
 def load_user(user_id):
     conn = conexion()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM usuarios WHERE id_usuario = %s", (user_id,))
+    cursor.execute("SELECT * FROM usuarios WHERE id = %s", (user_id,))
     data = cursor.fetchone()
     cerrar_conexion(conn)
 
@@ -32,19 +34,25 @@ def load_user(user_id):
 # Rutas principales
 # -------------------------------
 @app.route('/')
+@login_required
 def inicio():
-    return render_template('index.html', title="Inicio")
-
+    if current_user.is_authenticated:
+        return render_template('index.html', title="Inicio")
+    else:
+        return redirect(url_for('login'))
 
 @app.route('/about')
+@login_required
 def about():
     return render_template('about.html', title="Acerca de")
 
 
+
 # -------------------------------
-# Listar productos
+# Productos
 # -------------------------------
 @app.route('/productos')
+@login_required
 def listar_productos():
     conn = conexion()
     cursor = conn.cursor(dictionary=True)
@@ -54,10 +62,9 @@ def listar_productos():
     return render_template('productos/list.html', productos=productos)
 
 
-# -------------------------------
-# Crear producto
-# -------------------------------
+
 @app.route('/productos/nuevo', methods=['GET', 'POST'])
+@login_required
 def crear_producto():
     if request.method == 'POST':
         nombre = request.form['nombre']
@@ -65,21 +72,17 @@ def crear_producto():
 
         conn = conexion()
         cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO productos (nombre, precio) VALUES (%s, %s)",
-            (nombre, precio)
-        )
+        cursor.execute("INSERT INTO productos (nombre, precio) VALUES (%s, %s)", (nombre, precio))
         conn.commit()
         cerrar_conexion(conn)
         return redirect(url_for('listar_productos'))
-
+    
     return render_template('productos/form.html', title="Nuevo Producto")
 
 
-# -------------------------------
-# Editar producto
-# -------------------------------
+
 @app.route('/productos/editar/<int:pid>', methods=['GET', 'POST'])
+@login_required
 def editar_producto(pid):
     conn = conexion()
     cursor = conn.cursor(dictionary=True)
@@ -87,25 +90,20 @@ def editar_producto(pid):
     if request.method == 'POST':
         nombre = request.form['nombre']
         precio = request.form['precio']
-
-        cursor.execute(
-            "UPDATE productos SET nombre=%s, precio=%s WHERE id=%s",
-            (nombre, precio, pid)
-        )
+        cursor.execute("UPDATE productos SET nombre=%s, precio=%s WHERE id=%s", (nombre, precio, pid))
         conn.commit()
         cerrar_conexion(conn)
         return redirect(url_for('listar_productos'))
-
+    
     cursor.execute("SELECT id, nombre, precio FROM productos WHERE id=%s", (pid,))
     producto = cursor.fetchone()
     cerrar_conexion(conn)
     return render_template('productos/edit.html', producto=producto)
 
 
-# -------------------------------
-# Eliminar producto
-# -------------------------------
+
 @app.route('/productos/eliminar/<int:pid>', methods=['POST'])
+@login_required
 def eliminar_producto(pid):
     conn = conexion()
     cursor = conn.cursor()
@@ -114,14 +112,13 @@ def eliminar_producto(pid):
     cerrar_conexion(conn)
     return redirect(url_for('listar_productos'))
 
-#----------------------------------------------
-# Rutas para clientes
-#----------------------------------------------
+
 
 # -------------------------------
-# Listar clientes
+# Clientes
 # -------------------------------
 @app.route('/clientes')
+@login_required
 def listar_clientes():
     conn = conexion()
     cursor = conn.cursor(dictionary=True)
@@ -131,10 +128,9 @@ def listar_clientes():
     return render_template('clientes/list.html', clientes=clientes)
 
 
-# -------------------------------
-# Crear cliente
-# -------------------------------
+
 @app.route('/clientes/nuevo', methods=['GET', 'POST'])
+@login_required
 def crear_cliente():
     if request.method == 'POST':
         nombre = request.form['nombre']
@@ -142,21 +138,17 @@ def crear_cliente():
 
         conn = conexion()
         cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO clientes (nombre, mail) VALUES (%s, %s)",
-            (nombre, mail)
-        )
+        cursor.execute("INSERT INTO clientes (nombre, mail) VALUES (%s, %s)", (nombre, mail))
         conn.commit()
         cerrar_conexion(conn)
         return redirect(url_for('listar_clientes'))
-
+    
     return render_template('clientes/form.html', title="Nuevo Cliente")
 
 
-# -------------------------------
-# Editar cliente
-# -------------------------------
+
 @app.route('/clientes/editar/<int:cid>', methods=['GET', 'POST'])
+@login_required
 def editar_cliente(cid):
     conn = conexion()
     cursor = conn.cursor(dictionary=True)
@@ -164,25 +156,20 @@ def editar_cliente(cid):
     if request.method == 'POST':
         nombre = request.form['nombre']
         mail = request.form['mail']
-
-        cursor.execute(
-            "UPDATE clientes SET nombre=%s, mail=%s WHERE id_usuario=%s",
-            (nombre, mail, cid)
-        )
+        cursor.execute("UPDATE clientes SET nombre=%s, mail=%s WHERE id_usuario=%s", (nombre, mail, cid))
         conn.commit()
         cerrar_conexion(conn)
         return redirect(url_for('listar_clientes'))
-
+    
     cursor.execute("SELECT id_usuario, nombre, mail FROM clientes WHERE id_usuario=%s", (cid,))
     cliente = cursor.fetchone()
     cerrar_conexion(conn)
     return render_template('clientes/edit.html', cliente=cliente)
 
 
-# -------------------------------
-# Eliminar cliente
-# -------------------------------
+
 @app.route('/clientes/eliminar/<int:cid>', methods=['POST'])
+@login_required
 def eliminar_cliente(cid):
     conn = conexion()
     cursor = conn.cursor()
@@ -204,12 +191,11 @@ def registro():
 
         conn = conexion()
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO usuarios (nombre, password) VALUES (%s, %s)", (usuario, password))
+        cursor.execute("INSERT INTO usuarios (usuario, password) VALUES (%s, %s)", (usuario, password))
         conn.commit()
         cerrar_conexion(conn)
-        return "Usuario registrado exitosamente"
-
-    return render_template('registro.html')
+        return redirect(url_for('login'))
+    return render_template('usuarios/registro.html')
 
 
 # -------------------------------
@@ -223,29 +209,26 @@ def login():
 
         conn = conexion()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM usuarios WHERE nombre = %s", (usuario,))
+        cursor.execute("SELECT * FROM usuarios WHERE usuario = %s", (usuario,))
         data = cursor.fetchone()
         cerrar_conexion(conn)
 
         if data and check_password_hash(data[2], password):
             user = Usuario(data[0], data[1], data[2])
             login_user(user)
-            return "Login exitoso"
-
+            return redirect(url_for('inicio'))
         return "Credenciales incorrectas"
-
-    return render_template('login.html')
+    
+    return render_template('usuarios/login.html')
 
 
 # -------------------------------
 # Perfil
 # -------------------------------
 @app.route('/perfil')
+@login_required
 def perfil():
-    if current_user.is_authenticated:
-        return f'Bienvenido, {current_user.nombre}'
-    return 'Debes iniciar sesión para ver tu perfil'
-
+    return f'Bienvenido, {current_user.usuario}'
 
 # -------------------------------
 # Dashboard
@@ -263,8 +246,8 @@ def dashboard():
 @login_required
 def logout():
     logout_user()
-    return "Sesión cerrada exitosamente"
+    return redirect(url_for('login'))
 
-
+# -------------------------------
 if __name__ == '__main__':
     app.run(debug=True)
