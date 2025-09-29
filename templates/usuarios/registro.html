@@ -4,8 +4,12 @@
 {% block content %}
 <div class="d-flex justify-content-center align-items-center vh-100">
   <div class="card p-4 shadow" style="width: 350px;">
-    <h3 class="card-title text-center mb-3">Registro</h3>
-    <form method="post">
+    <h3 class="card-title text-center mb-3">Registro de Usuario</h3>
+
+    <!-- Mensajes de error dentro del formulario -->
+    <div id="error_msg" class="alert alert-danger d-none"></div>
+
+    <form method="post" id="formRegistro" onsubmit="return validarContraseña();">
       <div class="mb-3">
         <label for="usuario" class="form-label">Usuario</label>
         <input type="text" class="form-control" id="usuario" name="usuario" required>
@@ -14,11 +18,55 @@
         <label for="password" class="form-label">Contraseña</label>
         <input type="password" class="form-control" id="password" name="password" required>
       </div>
-      <button type="submit" class="btn btn-success w-100">Registrarse</button>
+      <div class="mb-3">
+        <label for="confirm_password" class="form-label">Repetir Contraseña</label>
+        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+      </div>
+      <button type="submit" class="btn btn-primary w-100">Registrar</button>
     </form>
+
     <p class="text-center mt-3">
-      ¿Ya tienes cuenta? <a href="{{ url_for('login') }}">Iniciar sesión</a>
+      ¿Ya tienes cuenta? <a href="{{ url_for('login') }}">Inicia sesión</a>
     </p>
   </div>
 </div>
+
+<script>
+  const password = document.getElementById('password');
+  const confirm = document.getElementById('confirm_password');
+  const errorMsg = document.getElementById('error_msg');
+
+  function validarContraseña() {
+    if (password.value !== confirm.value) {
+      // mostrar mensaje y marcar campos
+      errorMsg.textContent = 'Las contraseñas no coinciden';
+      errorMsg.classList.remove('d-none');
+      password.classList.add('is-invalid');
+      confirm.classList.add('is-invalid');
+      return false; // evita enviar formulario
+    }
+    // quitar estilos si coinciden
+    password.classList.remove('is-invalid');
+    confirm.classList.remove('is-invalid');
+    errorMsg.classList.add('d-none');
+    return true;
+  }
+
+  // quitar borde rojo automáticamente al escribir
+  password.addEventListener('input', () => {
+    if (password.value === confirm.value) {
+      password.classList.remove('is-invalid');
+      confirm.classList.remove('is-invalid');
+      errorMsg.classList.add('d-none');
+    }
+  });
+
+  confirm.addEventListener('input', () => {
+    if (password.value === confirm.value) {
+      password.classList.remove('is-invalid');
+      confirm.classList.remove('is-invalid');
+      errorMsg.classList.add('d-none');
+    }
+  });
+</script>
 {% endblock %}

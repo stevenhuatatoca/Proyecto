@@ -1,10 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, flash
 from conexion.conexion import conexion, cerrar_conexion
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, UserMixin, login_user, current_user, login_required, logout_user
 from models import Usuario
-from flask import redirect
-
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-secret-key'
@@ -15,7 +13,7 @@ app.config['SECRET_KEY'] = 'dev-secret-key'
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
-login_manager.login_message = "Debes iniciar sesión para acceder a esta página"
+login_manager.login_message = None  # No duplicar mensaje en formulario
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -26,27 +24,25 @@ def load_user(user_id):
     cerrar_conexion(conn)
 
     if data:
-        return Usuario(data[0], data[1], data[2])  # (id_usuario, nombre, password)
+        return Usuario(data[0], data[1], data[2])
     return None
 
+@login_manager.unauthorized_handler
+def unauthorized():
+    # Redirige al login si no está autenticado (mensaje global se muestra en base.html)
+    flash("Debes iniciar sesión para acceder a esta página", "info")
+    return redirect(url_for('login'))
 
 # -------------------------------
 # Rutas principales
 # -------------------------------
 @app.route('/')
-@login_required
 def inicio():
-    if current_user.is_authenticated:
-        return render_template('index.html', title="Inicio")
-    else:
-        return redirect(url_for('login'))
+    return render_template('index.html', title="Inicio")
 
 @app.route('/about')
-@login_required
 def about():
     return render_template('about.html', title="Acerca de")
-
-
 
 # -------------------------------
 # Productos
@@ -60,8 +56,6 @@ def listar_productos():
     productos = cursor.fetchall()
     cerrar_conexion(conn)
     return render_template('productos/list.html', productos=productos)
-
-
 
 @app.route('/productos/nuevo', methods=['GET', 'POST'])
 @login_required
@@ -78,8 +72,6 @@ def crear_producto():
         return redirect(url_for('listar_productos'))
     
     return render_template('productos/form.html', title="Nuevo Producto")
-
-
 
 @app.route('/productos/editar/<int:pid>', methods=['GET', 'POST'])
 @login_required
@@ -100,8 +92,6 @@ def editar_producto(pid):
     cerrar_conexion(conn)
     return render_template('productos/edit.html', producto=producto)
 
-
-
 @app.route('/productos/eliminar/<int:pid>', methods=['POST'])
 @login_required
 def eliminar_producto(pid):
@@ -111,8 +101,6 @@ def eliminar_producto(pid):
     conn.commit()
     cerrar_conexion(conn)
     return redirect(url_for('listar_productos'))
-
-
 
 # -------------------------------
 # Clientes
@@ -126,8 +114,6 @@ def listar_clientes():
     clientes = cursor.fetchall()
     cerrar_conexion(conn)
     return render_template('clientes/list.html', clientes=clientes)
-
-
 
 @app.route('/clientes/nuevo', methods=['GET', 'POST'])
 @login_required
@@ -144,8 +130,6 @@ def crear_cliente():
         return redirect(url_for('listar_clientes'))
     
     return render_template('clientes/form.html', title="Nuevo Cliente")
-
-
 
 @app.route('/clientes/editar/<int:cid>', methods=['GET', 'POST'])
 @login_required
@@ -166,8 +150,6 @@ def editar_cliente(cid):
     cerrar_conexion(conn)
     return render_template('clientes/edit.html', cliente=cliente)
 
-
-
 @app.route('/clientes/eliminar/<int:cid>', methods=['POST'])
 @login_required
 def eliminar_cliente(cid):
@@ -178,8 +160,6 @@ def eliminar_cliente(cid):
     cerrar_conexion(conn)
     return redirect(url_for('listar_clientes'))
 
-
-
 # -------------------------------
 # Registro de usuarios
 # -------------------------------
@@ -187,16 +167,25 @@ def eliminar_cliente(cid):
 def registro():
     if request.method == 'POST':
         usuario = request.form['usuario']
-        password = generate_password_hash(request.form['password'])
+        password = request.form['password']
+        confirm_password = request.form['confirm_password']
+
+        # Validación servidor
+        if password != confirm_password:
+            flash("Las contraseñas no coinciden", "danger")
+            return redirect(url_for('registro'))
 
         conn = conexion()
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO usuarios (usuario, password) VALUES (%s, %s)", (usuario, password))
+        cursor.execute("INSERT INTO usuarios (usuario, password) VALUES (%s, %s)", 
+                       (usuario, generate_password_hash(password)))
         conn.commit()
         cerrar_conexion(conn)
-        return redirect(url_for('login'))
-    return render_template('usuarios/registro.html')
 
+        flash("Usuario registrado correctamente", "success")
+        return redirect(url_for('login'))
+
+    return render_template('usuarios/registro.html')
 
 # -------------------------------
 # Login
@@ -213,14 +202,20 @@ def login():
         data = cursor.fetchone()
         cerrar_conexion(conn)
 
+        if not data:
+            flash("Usuario no existe", "danger")
+            return redirect(url_for('login'))
+
         if data and check_password_hash(data[2], password):
             user = Usuario(data[0], data[1], data[2])
             login_user(user)
+            flash("Sesión iniciada correctamente", "success")
             return redirect(url_for('inicio'))
-        return "Credenciales incorrectas"
+        else:
+            flash("Usuario o contraseña inválida", "danger")
+            return redirect(url_for('login'))
     
     return render_template('usuarios/login.html')
-
 
 # -------------------------------
 # Perfil
@@ -238,7 +233,6 @@ def perfil():
 def dashboard():
     return "Bienvenido al panel de control"
 
-
 # -------------------------------
 # Logout
 # -------------------------------
@@ -246,7 +240,8 @@ def dashboard():
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('login'))
+    flash("Sesión cerrada correctamente", "info")
+    return redirect(url_for('inicio'))
 
 # -------------------------------
 if __name__ == '__main__':
