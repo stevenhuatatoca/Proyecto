@@ -15,6 +15,8 @@
       <th>ID</th>
       <th>Producto</th>
       <th>Precio</th>
+      <th>Categoría</th>
+      <th>Marca</th>
       <th>Acciones</th>
     </tr>
   </thead>
@@ -24,6 +26,8 @@
       <td>{{ p.id }}</td>
       <td>{{ p.nombre }}</td>
       <td>${{ '%.2f'|format(p.precio) }}</td>
+      <td>{{ p.categoria }}</td>
+      <td>{{ p.marca }}</td>
       <td>
         <!-- Botón Editar -->
         <a href="{{ url_for('editar_producto', pid=p.id) }}" class="btn btn-outline-warning btn-sm">Editar</a>
@@ -38,6 +42,20 @@
     {% endfor %}
   </tbody>
 </table>
+
+<!-- Paginación -->
+{% if total_pages > 1 %}
+<nav aria-label="Page navigation">
+  <ul class="pagination justify-content-center">
+    {% for page_num in range(1, total_pages + 1) %}
+      <li class="page-item {% if page_num == current_page %}active{% endif %}">
+        <a class="page-link" href="{{ url_for('listar_productos', page=page_num) }}">{{ page_num }}</a>
+      </li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+
 {% else %}
 <p>No hay productos que mostrar.</p>
 {% endif %}
